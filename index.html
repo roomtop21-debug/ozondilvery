@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>OZON — доставка на дом, пгт Стрижи</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --ozon-blue:#005BFF;
+    --ozon-blue-dark:#0042C2;
+    --ink:#0B1F3A;
+    --ink-soft:#5B6B85;
+    --paper:#FFFFFF;
+    --tint:#EEF3FF;
+    --warn:#FF7A1A;
+    --danger:#E63946;
+    --good:#1FA971;
+    --line:#DCE6FB;
+    --radius-lg:26px;
+    --radius-md:18px;
+    --radius-sm:12px;
+    --shadow:0 12px 32px rgba(0,60,180,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:'Manrope', system-ui, sans-serif;
+    background:
+      radial-gradient(circle at 15% -10%, #DCEBFF 0%, transparent 45%),
+      radial-gradient(circle at 100% 0%, #E7F8FF 0%, transparent 40%),
+      var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  button{font-family:inherit;}
+
+  /* ================= SPLASH ================= */
+  #splash{
+    position:fixed;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 0%, #EAF2FF 0%, #FFFFFF 55%);
+    z-index:50;text-align:center;padding:24px;
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  #splash.hide{opacity:0;transform:scale(0.98);pointer-events:none;}
+  .splash-logo-mark{
+    width:104px;height:104px;border-radius:32px;overflow:hidden;
+    box-shadow:var(--shadow);background:var(--paper);
+    display:flex;align-items:center;justify-content:center;
+    animation:float 3.4s ease-in-out infinite;
+  }
+  .splash-logo-mark img{width:100%;height:100%;object-fit:cover;}
+  @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+  .splash-wordmark{margin-top:22px;height:38px;}
+  .splash-wordmark img{height:100%;display:block;}
+  .splash-tagline{margin-top:28px;font-size:26px;font-weight:800;letter-spacing:-0.02em;max-width:340px;line-height:1.25;}
+  .splash-sub{margin-top:10px;font-size:15px;color:var(--ink-soft);font-weight:600;}
+  .btn-primary{
+    margin-top:34px;background:linear-gradient(180deg, var(--ozon-blue) 0%, var(--ozon-blue-dark) 100%);
+    color:#fff;border:none;padding:18px 54px;font-size:17px;font-weight:800;border-radius:999px;
+    cursor:pointer;box-shadow:0 10px 24px rgba(0,91,255,0.35);
+    transition:transform .15s ease, box-shadow .15s ease;letter-spacing:-0.01em;
+  }
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,91,255,0.42);}
+  .btn-primary:active{transform:translateY(0px) scale(0.98);}
+
+  /* ================= APP SHELL ================= */
+  #app{display:none;min-height:100vh;padding-bottom:40px;}
+  #app.show{display:block;animation:fadein .5s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  header.topbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:16px 20px;max-width:1180px;margin:0 auto;
+  }
+  .brand-mark{width:38px;height:38px;border-radius:11px;overflow:hidden;box-shadow:0 4px 10px rgba(0,60,180,0.18);flex:none;}
+  .brand-mark img{width:100%;height:100%;object-fit:cover;}
+  .brand-word img{height:18px;display:block;}
+  .topbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .topbar-sub{
+    font-size:12.5px;font-weight:700;color:var(--ozon-blue);
+    background:var(--tint);padding:7px 13px;border-radius:999px;white-space:nowrap;
+  }
+  .btn-track{
+    font-size:12.5px;font-weight:800;color:#fff;background:var(--ink);
+    border:none;padding:9px 15px;border-radius:999px;cursor:pointer;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:6px;transition:transform .15s ease;
+  }
+  .btn-track:hover{transform:translateY(-1px);}
+
+  main{max-width:1180px;margin:0 auto;padding:0 20px;}
+
+  .hero-line{font-size:14.5px;color:var(--ink-soft);font-weight:600;margin:2px 4px 16px;max-width:760px;}
+  .hero-line b{color:var(--ink);}
+
+  .layout-grid{display:flex;flex-direction:column;gap:20px;}
+
+  .map-card{
+    position:relative;border-radius:var(--radius-lg);overflow:hidden;
+    box-shadow:var(--shadow);border:1px solid var(--line);flex:none;
+  }
+  #map{height:320px;width:100%;background:var(--tint);}
+
+  .price-badge{
+    position:absolute;top:14px;right:14px;background:var(--paper);border-radius:999px;
+    padding:10px 16px;box-shadow:0 8px 20px rgba(0,60,180,0.22);
+    display:flex;flex-direction:column;align-items:center;z-index:400;
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1);min-width:92px;
+  }
+  .price-badge.bump{transform:scale(1.12);}
+  .price-badge .label{font-size:9.5px;font-weight:800;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .price-badge .value{font-size:18px;font-weight:800;color:var(--ozon-blue);}
+
+  .map-hint{
+    position:absolute;left:14px;bottom:14px;background:rgba(11,31,58,0.8);color:#fff;
+    font-size:12px;font-weight:600;padding:8px 13px;border-radius:999px;z-index:400;
+    max-width:calc(100% - 130px);
+  }
+  .geo-loading{
+    position:absolute;inset:0;background:rgba(255,255,255,0.75);display:flex;
+    align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--ink-soft);
+    z-index:500;pointer-events:none;opacity:0;transition:opacity .2s ease;
+  }
+  .geo-loading.show{opacity:1;}
+
+  .pvz-edit-control{position:absolute;top:14px;left:14px;z-index:450;max-width:calc(100% - 120px);}
+  .pvz-edit-btn{
+    background:#fff;border:none;border-radius:999px;padding:8px 13px;font-size:11.5px;font-weight:800;
+    color:var(--ink);box-shadow:0 6px 16px rgba(0,60,180,0.18);cursor:pointer;
+    display:inline-flex;align-items:center;gap:5px;transition:transform .15s ease;
+  }
+  .pvz-edit-btn:hover{transform:translateY(-1px);}
+  .pvz-edit-banner{
+    display:none;align-items:center;gap:8px;flex-wrap:wrap;
+    background:var(--ink);color:#fff;border-radius:14px;padding:10px 12px;font-size:11.5px;font-weight:600;
+  }
+  .pvz-edit-banner.show{display:flex;}
+  .pvz-edit-banner .actions{display:flex;gap:6px;}
+  .pvz-edit-banner button{border:none;border-radius:999px;padding:6px 12px;font-size:11.5px;font-weight:800;cursor:pointer;}
+  .pvz-save-btn{background:var(--ozon-blue);color:#fff;}
+  .pvz-cancel-btn{background:rgba(255,255,255,0.18);color:#fff;}
+  .pvz-calibrated-badge{
+    position:absolute;top:14px;left:14px;z-index:450;
+    background:rgba(0,91,255,0.12);color:var(--ozon-blue);
+    border:1px solid rgba(0,91,255,0.2);
+    border-radius:999px;padding:6px 14px;font-size:11px;font-weight:700;
+    backdrop-filter:blur(4px);
+    display:none;
+  }
+  .pvz-calibrated-badge.show{display:block;}
+
+  .pvz-dot{width:15px;height:15px;border-radius:50%;background:var(--ozon-blue);border:3px solid #fff;box-shadow:0 0 0 4px rgba(0,91,255,0.25);}
+  .dest-dot{
+    width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;
+    border-bottom:24px solid var(--warn);filter:drop-shadow(0 4px 6px rgba(0,0,0,0.25));
+    animation:drop .35s ease;
+  }
+  @keyframes drop{from{transform:translateY(-14px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+  .form-card{
+    background:var(--paper);border-radius:var(--radius-lg);border:1px solid var(--line);
+    box-shadow:0 6px 20px rgba(0,60,180,0.06);padding:22px 20px;flex:none;
+  }
+  .form-card h2{margin:0 0 4px;font-size:18px;font-weight:800;letter-spacing:-0.01em;}
+  .form-card .sub{margin:0 0 18px;color:var(--ink-soft);font-size:13px;font-weight:600;}
+
+  .row{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px;}
+
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.01em;}
+  .field input{
+    width:100%;border:1.5px solid var(--line);background:var(--tint);border-radius:var(--radius-sm);
+    padding:13px 14px;font-size:15px;font-weight:600;color:var(--ink);outline:none;
+    transition:border-color .15s ease, background .15s ease;font-family:inherit;
+  }
+  .field input::placeholder{color:#9BAAC7;font-weight:500;}
+  .field input:focus{border-color:var(--ozon-blue);background:#fff;}
+  .field input.error{border-color:var(--danger);background:#FFF1F1;}
+  .field .barcode-input{font-family:'Courier New', monospace;letter-spacing:.03em;}
+  .field-error{
+    font-size:11.5px;font-weight:700;color:var(--danger);margin-top:5px;min-height:14px;
+    opacity:0;transition:opacity .15s ease;
+  }
+  .field-error.show{opacity:1;}
+
+  .summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+  .summary .chip{background:var(--tint);border-radius:var(--radius-sm);padding:11px 13px;}
+  .summary .chip.wide{grid-column:1 / -1;}
+  .summary .chip .k{font-size:10.5px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .summary .chip .v{font-size:13.5px;font-weight:700;margin-top:3px;color:var(--ink);word-break:break-word;}
+  .summary .chip.price .v{color:var(--ozon-blue);}
+
+  .submit-row{margin-top:20px;}
+  .btn-submit{
+    width:100%;background:linear-gradient(180deg, var(--ozon-blue) 0%, var(--ozon-blue-dark) 100%);
+    color:#fff;border:none;border-radius:999px;padding:16px;font-size:15.5px;font-weight:800;
+    cursor:pointer;letter-spacing:-0.01em;box-shadow:0 10px 22px rgba(0,91,255,0.3);
+    transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+  }
+  .btn-submit:hover{transform:translateY(-1px);}
+  .btn-submit:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;transform:none;}
+  .submit-hint{margin-top:10px;font-size:12px;font-weight:600;color:var(--ink-soft);text-align:center;min-height:16px;}
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translate(-50%, 20px);
+    background:var(--danger);color:#fff;font-weight:700;font-size:13px;padding:12px 18px;
+    border-radius:999px;box-shadow:0 10px 24px rgba(230,57,70,0.35);opacity:0;pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;z-index:900;max-width:88%;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
+
+  /* ================= MODALS ================= */
+  .overlay{
+    position:fixed;inset:0;background:rgba(11,31,58,0.55);display:none;align-items:center;
+    justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(2px);
+  }
+  .overlay.show{display:flex;animation:fadein .25s ease;}
+  .modal-card{
+    background:#fff;border-radius:var(--radius-lg);max-width:420px;width:100%;
+    padding:28px 24px 24px;text-align:center;box-shadow:0 24px 60px rgba(0,20,60,0.35);
+    animation:pop .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop{from{transform:scale(.85);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .modal-icon{width:60px;height:60px;border-radius:50%;background:var(--tint);display:flex;
+    align-items:center;justify-content:center;margin:0 auto 14px;font-size:28px;}
+  .modal-card h3{margin:0 0 10px;font-size:18px;font-weight:800;color:var(--ink);}
+  .modal-card p{margin:0;font-size:14px;color:var(--ink-soft);font-weight:600;line-height:1.5;}
+  .modal-card p.warn{color:var(--warn);margin-top:10px;font-weight:700;}
+  .modal-card .order-id{margin-top:16px;font-size:12px;font-weight:700;color:var(--ozon-blue);
+    background:var(--tint);display:inline-block;padding:7px 13px;border-radius:999px;}
+  .modal-close{margin-top:20px;width:100%;background:var(--ink);color:#fff;border:none;
+    border-radius:999px;padding:13px;font-size:14.5px;font-weight:800;cursor:pointer;}
+  .modal-ghost{margin-top:10px;width:100%;background:transparent;color:var(--ink-soft);
+    border:1.5px solid var(--line);border-radius:999px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;}
+
+  /* ================= PAYMENT MODAL ================= */
+  .payment-modal .modal-card{max-width:440px;}
+  .payment-modal .price-display{
+    font-size:32px;font-weight:800;color:var(--ozon-blue);
+    margin:8px 0 4px;
+  }
+  .payment-modal .price-label{
+    font-size:14px;color:var(--ink-soft);font-weight:600;
+  }
+  .payment-modal .payment-options{
+    margin:16px 0 12px;
+    text-align:left;
+  }
+  .payment-modal .payment-options label{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px;
+    background:var(--tint);
+    border-radius:12px;
+    margin-bottom:8px;
+    cursor:pointer;
+    font-weight:600;
+    font-size:14px;
+    color:var(--ink);
+    transition:background .15s ease;
+    border:2px solid transparent;
+  }
+  .payment-modal .payment-options label:hover{
+    background:#e0e8f5;
+  }
+  .payment-modal .payment-options label input[type="radio"]{
+    width:18px;height:18px;accent-color:var(--ozon-blue);flex-shrink:0;
+  }
+  .payment-modal .payment-options label.selected{
+    border-color:var(--ozon-blue);
+    background:#e8f0ff;
+  }
+  .payment-modal .cash-hint{
+    font-size:13px;color:var(--ink-soft);font-weight:500;
+    margin:4px 0 14px;
+    padding:10px 14px;
+    background:#f5f7fa;
+    border-radius:10px;
+  }
+  .payment-modal .btn-pay{
+    width:100%;padding:14px;
+    background:linear-gradient(180deg, var(--good) 0%, #1a8a5a 100%);
+    color:#fff;border:none;border-radius:999px;
+    font-size:16px;font-weight:800;cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+    box-shadow:0 6px 18px rgba(31,169,113,0.3);
+  }
+  .payment-modal .btn-pay:hover{transform:translateY(-1px);}
+  .payment-modal .btn-pay:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+
+  /* ================= COOLDOWN ================= */
+  .cooldown-badge{
+    display:inline-block;
+    background:#fce4ec;
+    color:#e53935;
+    padding:4px 14px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    margin-top:8px;
+  }
+
+  .track-state{display:none;}
+  .track-state.active{display:block;}
+  .track-loading{padding:6px 0;}
+  .track-loading .spinner{
+    width:34px;height:34px;border-radius:50%;border:3px solid var(--tint);border-top-color:var(--ozon-blue);
+    margin:0 auto 14px;animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .track-order-card{text-align:left;margin-top:6px;}
+  .track-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+    padding:10px 0;border-bottom:1px dashed var(--line);}
+  .track-row:last-child{border-bottom:none;}
+  .track-row .k{font-size:12px;font-weight:700;color:var(--ink-soft);}
+  .track-row .v{font-size:13.5px;font-weight:700;color:var(--ink);text-align:right;max-width:60%;word-break:break-word;}
+  .status-badge{
+    display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;
+    padding:6px 12px;border-radius:999px;background:var(--tint);color:var(--ozon-blue);
+  }
+  .status-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .status-badge.status-done{background:#E7F8F0;color:var(--good);}
+  .status-badge.status-transit{background:#FFF1E3;color:var(--warn);}
+  .status-badge.status-cancel{background:#FDECEC;color:var(--danger);}
+
+  .leaflet-container{font-family:'Manrope', sans-serif;}
+
+  /* ================= FIREBASE TOAST ================= */
+  .fb-toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 14px 28px;
+    border-radius: 14px;
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 14px;
+    z-index: 9999;
+    max-width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    animation: fadeInUp 0.3s ease;
+    backdrop-filter: blur(8px);
+  }
+  .fb-toast strong { display: block; font-size: 16px; margin-bottom: 4px; }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  /* ================= TABLET (>= 700px) ================= */
+  @media (min-width:700px){
+    .row{grid-template-columns:1fr 1fr;}
+    .form-card{padding:26px;}
+    #map{height:360px;}
+    .price-badge{padding:12px 18px;min-width:104px;}
+    .price-badge .value{font-size:20px;}
+  }
+
+  /* ================= DESKTOP (>= 1040px) ================= */
+  @media (min-width:1040px){
+    header.topbar{padding:22px 20px;}
+    .layout-grid{flex-direction:row;align-items:flex-start;gap:24px;}
+    .map-card{flex:1.35;position:sticky;top:20px;}
+    #map{height:520px;}
+    .form-card{flex:1;padding:28px;position:sticky;top:20px;}
+    .hero-line{margin:2px 4px 20px;font-size:15px;}
+    .summary{grid-template-columns:1fr 1fr;}
+  }
+
+  @media (max-width:699px){
+    .price-badge{top:10px;right:10px;padding:8px 12px;min-width:78px;}
+    .price-badge .label{font-size:8.5px;}
+    .price-badge .value{font-size:15px;}
+    .map-hint{font-size:11px;padding:7px 11px;left:10px;bottom:10px;max-width:calc(100% - 110px);}
+    #map{height:280px;}
+    .form-card{padding:18px 16px;}
+    .topbar-actions{margin-left:0;width:100%;justify-content:flex-end;}
+    .payment-modal .modal-card{padding:20px 16px;}
+    .payment-modal .price-display{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+
+  <!-- ================= SPLASH ================= -->
+  <div id="splash">
+    <div class="splash-logo-mark">
+      <img src="https://tse2.mm.bing.net/th/id/OIP.MfHSpx0adlCl9FbJzIGi0wAAAA?r=0&rs=1&pid=ImgDetMain&o=7&rm=3" alt="Ozon">
+    </div>
+    <div class="splash-wordmark">
+      <img src="https://docs.ozon.ru/company/images/logo_Ozon_new.png" alt="OZON" onerror="this.style.display='none'">
+    </div>
+    <div class="splash-tagline">Получи свой товар прямо на дом!</div>
+    <div class="splash-sub">Доставка по пгт Стрижи, Кировская обл.</div>
+    <button class="btn-primary" id="startBtn">Погнали!</button>
+  </div>
+
+  <!-- ================= APP ================= -->
+  <div id="app">
+    <header class="topbar">
+      <div class="brand-mark"><img src="https://tse2.mm.bing.net/th/id/OIP.MfHSpx0adlCl9FbJzIGi0wAAAA?r=0&rs=1&pid=ImgDetMain&o=7&rm=3" alt="Ozon"></div>
+      <div class="brand-word"><img src="https://docs.ozon.ru/company/images/logo_Ozon_new.png" alt="OZON" onerror="this.style.display='none'"></div>
+      <div class="topbar-actions">
+        <button class="btn-track" id="openTrackBtn">📦 Отследить доставку</button>
+        <div class="topbar-sub">пгт Стрижи</div>
+      </div>
+    </header>
+
+    <main>
+      <p class="hero-line">Отметь на карте, куда привезти заказ. Точка выдачи — <b>ул. Комсомольская, 4, пгт Стрижи</b>. Стоимость доставки растёт вместе с расстоянием и считается автоматически.</p>
+
+      <div class="layout-grid">
+        <div class="map-card">
+          <div id="map"></div>
+          <div class="price-badge" id="priceBadge">
+            <div class="label">Доставка</div>
+            <div class="value" id="priceValue">—</div>
+          </div>
+          <div class="map-hint" id="mapHint">Нажми на карту, чтобы выбрать адрес доставки</div>
+          <div class="geo-loading" id="geoLoading">Определяю адрес…</div>
+          <div class="pvz-edit-control" id="pvzEditControl">
+            <button class="pvz-edit-btn" id="pvzEditToggle">📍 Уточнить точку ПВЗ</button>
+            <div class="pvz-edit-banner" id="pvzEditBanner">
+              <span>Перетащи синюю точку точно на ПВЗ</span>
+              <div class="actions">
+                <button class="pvz-save-btn" id="pvzSaveBtn">Сохранить</button>
+                <button class="pvz-cancel-btn" id="pvzCancelBtn">Отмена</button>
+              </div>
+            </div>
+          </div>
+          <div class="pvz-calibrated-badge" id="pvzCalibratedBadge">✅ ПВЗ откалиброван</div>
+        </div>
+
+        <div class="form-card">
+          <h2>Данные получателя</h2>
+          <p class="sub">Заполни всё точно — курьер позвонит перед приездом.</p>
+
+          <div class="row">
+            <div class="field">
+              <label for="fname">Имя</label>
+              <input id="fname" type="text" placeholder="Иван">
+              <div class="field-error" id="err-fname"></div>
+            </div>
+            <div class="field">
+              <label for="lname">Фамилия</label>
+              <input id="lname" type="text" placeholder="Иванов">
+              <div class="field-error" id="err-lname"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="phone">Номер телефона</label>
+              <input id="phone" type="tel" placeholder="+7 900 000-00-00">
+              <div class="field-error" id="err-phone"></div>
+            </div>
+            <div class="field">
+              <label for="barcode">Код со штрих-кода</label>
+              <input id="barcode" class="barcode-input" type="text" placeholder="123456789*8765" maxlength="14">
+              <div class="field-error" id="err-barcode"></div>
+            </div>
+          </div>
+
+          <div class="summary">
+            <div class="chip wide">
+              <div class="k">Адрес доставки</div>
+              <div class="v" id="sumAddress">не выбран</div>
+            </div>
+            <div class="chip">
+              <div class="k">Расстояние от ПВЗ</div>
+              <div class="v" id="sumDistance">—</div>
+            </div>
+            <div class="chip price">
+              <div class="k">Стоимость</div>
+              <div class="v" id="sumPrice">—</div>
+            </div>
+          </div>
+
+          <div class="submit-row">
+            <button class="btn-submit" id="submitBtn" disabled>Сделать доставку</button>
+            <div class="submit-hint" id="submitHint">Заполни форму и выбери адрес на карте</div>
+            <div id="cooldownContainer" style="text-align:center;margin-top:6px;"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ================= ORDER CONFIRM MODAL ================= -->
+  <div class="overlay" id="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-icon">🛵</div>
+      <h3>Заказ оформлен!</h3>
+      <p>Заказ привезут в течение 30 минут!</p>
+      <p class="warn">Если мы не сможем до вас дозвониться — товар сгорит.</p>
+      <div class="order-id" id="orderId">Заказ №000000</div>
+      <button class="modal-close" id="modalCloseBtn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- ================= PAYMENT MODAL ================= -->
+  <div class="overlay payment-modal" id="paymentModal">
+    <div class="modal-card">
+      <div class="modal-icon">💳</div>
+      <h3>Оплата доставки</h3>
+      <p class="price-label">У вас будет сумма к оплате</p>
+      <div class="price-display" id="paymentPrice">0 ₽</div>
+      
+      <div class="payment-options">
+        <label class="selected" id="payCashLabel">
+          <input type="radio" name="paymentMethod" value="cash" checked>
+          💵 Наличными при встрече
+        </label>
+        <label id="payCardLabel">
+          <input type="radio" name="paymentMethod" value="card">
+          💳 Переводом на карту
+        </label>
+        <div class="cash-hint" id="paymentHint">⚠️ Оплата производится курьеру при получении заказа</div>
+      </div>
+
+      <button class="btn-pay" id="payBtn">✅ Оплатить</button>
+      <button class="modal-ghost" id="payCancelBtn" style="margin-top:10px;">Отмена</button>
+    </div>
+  </div>
+
+  <!-- ================= TRACK MODAL ================= -->
+  <div class="overlay" id="track-overlay">
+    <div class="modal-card">
+
+      <div class="track-state track-loading" id="trackLoading">
+        <div class="spinner"></div>
+        <h3>Ищу твой заказ…</h3>
+      </div>
+
+      <div class="track-state" id="trackEmpty">
+        <div class="modal-icon">🧐</div>
+        <h3>Вы ничего не заказывали, может закажите?</h3>
+        <p>Мы пока не видим ни одной вашей доставки.</p>
+        <button class="modal-close" id="trackGoOrderBtn">Оформить доставку</button>
+        <button class="modal-ghost" id="trackCloseBtn1">Закрыть</button>
+      </div>
+
+      <div class="track-state" id="trackFound">
+        <div class="modal-icon">📦</div>
+        <h3>Ваш заказ в пути</h3>
+        <div class="track-order-card">
+          <div class="track-row">
+            <div class="k">Номер заказа</div>
+            <div class="v" id="trackOrderId">—</div>
+          </div>
+          <div class="track-row">
+            <div class="k">Статус</div>
+            <div class="v"><span class="status-badge" id="trackStatusBadge"><span class="dot"></span><span id="trackStatusText">—</span></span></div>
+          </div>
+          <div class="track-row">
+            <div class="k">Адрес</div>
+            <div class="v" id="trackAddress">—</div>
+          </div>
+          <div class="track-row">
+            <div class="k">Получатель</div>
+            <div class="v" id="trackRecipient">—</div>
+          </div>
+          <div class="track-row">
+            <div class="k">Стоимость</div>
+            <div class="v" id="trackPrice">—</div>
+          </div>
+        </div>
+        <button class="modal-close" id="trackRefreshBtn">Обновить статус</button>
+        <button class="modal-ghost" id="trackCloseBtn2">Закрыть</button>
+      </div>
+
+      <div class="track-state" id="trackError">
+        <div class="modal-icon">⚠️</div>
+        <h3>Не получилось проверить заказ</h3>
+        <p>Что-то пошло не так. Попробуй ещё раз чуть позже.</p>
+        <button class="modal-close" id="trackRetryBtn">Повторить</button>
+        <button class="modal-ghost" id="trackCloseBtn3">Закрыть</button>
+      </div>
+
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  // ============================================================
+  // FIREBASE КОНФИГ
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyDAsDPGgbpx85dlwUkg3fibLndV5DTBSWI",
+    authDomain: "ozon-workhub.firebaseapp.com",
+    databaseURL: "https://ozon-workhub-default-rtdb.firebaseio.com",
+    projectId: "ozon-workhub",
+    storageBucket: "ozon-workhub.firebasestorage.app",
+    messagingSenderId: "340903219027",
+    appId: "1:340903219027:web:6e4ccc8b0baef0636cdba6",
+    measurementId: "G-W8SEVBP5DT"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  console.log('🔥 Firebase инициализирован на клиентском сайте!');
+
+  // ============================================================
+  // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ТОСТОВ
+  // ============================================================
+  function showFBToast(title, text) {
+    const existing = document.querySelector('.fb-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'fb-toast';
+    toast.innerHTML = `<strong>${title}</strong>${text}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  // ============================================================
+  // ГЕНЕРАЦИЯ НАСТОЯЩЕГО НОМЕРА ЗАКАЗА (на основе времени)
+  // ============================================================
+  function generateOrderNumber() {
+    const now = new Date();
+    const year = String(now.getFullYear()).slice(2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+    return `${year}${month}${day}${hours}${minutes}${seconds}${random}`;
+  }
+
+  // ============================================================
+  // СОХРАНЕНИЕ ЗАКАЗА В FIREBASE
+  // ============================================================
+  function saveOrderToFirebase(order) {
+    const ordersRef = database.ref('homeDelivery/orders');
+    
+    return ordersRef.push({
+      orderId: order.id,
+      firstName: order.firstName,
+      lastName: order.lastName,
+      phone: order.phone,
+      barcode: order.barcode,
+      address: order.address,
+      distance: order.distance || '—',
+      price: order.price || '0 ₽',
+      status: 'new',
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedBy: '',
+      updatedAt: null,
+      lat: order.lat || null,
+      lng: order.lng || null
+    });
+  }
+
+  // ============================================================
+  // COOLDOWN (15 МИНУТ) — запускается ТОЛЬКО после оплаты
+  // ============================================================
+  const COOLDOWN_MS = 15 * 60 * 1000;
+
+  function getLastOrderTime() {
+    try {
+      return parseInt(localStorage.getItem('last_order_timestamp')) || 0;
+    } catch(e) {
+      return 0;
+    }
+  }
+
+  function setLastOrderTime() {
+    try {
+      localStorage.setItem('last_order_timestamp', String(Date.now()));
+    } catch(e) {}
+  }
+
+  function getCooldownRemaining() {
+    const last = getLastOrderTime();
+    const elapsed = Date.now() - last;
+    const remaining = COOLDOWN_MS - elapsed;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  function isCooldownActive() {
+    return getCooldownRemaining() > 0;
+  }
+
+  function updateCooldownUI() {
+    const container = document.getElementById('cooldownContainer');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (isCooldownActive()) {
+      const remaining = getCooldownRemaining();
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      container.innerHTML = `
+        <span class="cooldown-badge">⏳ Следующий заказ через ${minutes} мин ${seconds} сек</span>
+      `;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Подождите';
+      return true;
+    } else {
+      container.innerHTML = '';
+      const ok = validateForm(false);
+      submitBtn.disabled = !ok;
+      submitBtn.textContent = 'Сделать доставку';
+      return false;
+    }
+  }
+
+  // Обновляем кулдаун каждую секунду
+  setInterval(updateCooldownUI, 1000);
+
+  // ============================================================
+  // ---------- SPLASH -> APP ----------
+  // ============================================================
+  var splash = document.getElementById('splash');
+  var app = document.getElementById('app');
+  var mapInited = false;
+
+  document.getElementById('startBtn').addEventListener('click', function(){
+    splash.classList.add('hide');
+    setTimeout(function(){
+      splash.style.display = 'none';
+      app.classList.add('show');
+      if(!mapInited){ initMap(); mapInited = true; }
+      updateCooldownUI();
+    }, 480);
+  });
+
+  // ---------- CONSTANTS ----------
+  var PVZ = { lat: 58.45864, lng: 49.25544 };
+  var PVZ_QUERY = 'Комсомольская улица 4, Стрижи, Оричевский район, Кировская область, Россия';
+  var MAX_SANE_DRIFT_M = 450;
+  var MAX_RADIUS_M = 2100;
+  var BASE_PRICE = 99;
+  var RATE_PER_100M = 11;
+  var pvzCalibrated = false;
+
+  var map, pvzMarker, destMarker, zoneCircle;
+  var chosenDest = null;
+  var chosenAddressText = null;
+  var lastPrice = null;
+  var lastDistanceText = null;
+  var geoAbortSeq = 0;
+
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2600);
+  }
+
+  function setGeoLoading(on){
+    document.getElementById('geoLoading').classList.toggle('show', !!on);
+  }
+
+  function initMap(){
+    map = L.map('map', { zoomControl: true }).setView([PVZ.lat, PVZ.lng], 16);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    zoneCircle = L.circle([PVZ.lat, PVZ.lng], {
+      radius: MAX_RADIUS_M, color: '#005BFF', weight: 1.5,
+      fillColor: '#005BFF', fillOpacity: 0.06, dashArray: '6 8'
+    }).addTo(map);
+
+    var pvzIcon = L.divIcon({ className: '', html: '<div class="pvz-dot"></div>', iconSize:[21,21], iconAnchor:[10,10] });
+    pvzMarker = L.marker([PVZ.lat, PVZ.lng], {icon: pvzIcon, interactive:true, draggable:false}).addTo(map);
+    pvzMarker.bindTooltip('ПВЗ · ул. Комсомольская, 4', {permanent:false, direction:'top'});
+    pvzMarker.on('drag', function(e){ zoneCircle.setLatLng(e.target.getLatLng()); });
+
+    map.on('click', function(e){
+      if(pvzEditing) return;
+      var distFromPvz = map.distance(e.latlng, [PVZ.lat, PVZ.lng]);
+      if(distFromPvz > MAX_RADIUS_M){
+        toast('Доставка возможна только в пределах пгт Стрижи');
+        return;
+      }
+      placeDest(e.latlng);
+    });
+
+    loadSavedPvz().then(function(saved){
+      if(saved){
+        PVZ.lat = saved.lat; PVZ.lng = saved.lng;
+        pvzMarker.setLatLng([PVZ.lat, PVZ.lng]);
+        zoneCircle.setLatLng([PVZ.lat, PVZ.lng]);
+        map.setView([PVZ.lat, PVZ.lng], 16);
+        pvzCalibrated = true;
+        updatePvzUI();
+      } else {
+        geocodePvz();
+      }
+    });
+
+    initPvzEditControl();
+  }
+
+  // ---------- PVZ CALIBRATION ----------
+  var pvzEditing = false;
+  var pvzBeforeEdit = null;
+
+  function initPvzEditControl(){
+    var toggleBtn = document.getElementById('pvzEditToggle');
+    var banner = document.getElementById('pvzEditBanner');
+    var saveBtn = document.getElementById('pvzSaveBtn');
+    var cancelBtn = document.getElementById('pvzCancelBtn');
+
+    toggleBtn.addEventListener('click', function(){
+      if(pvzCalibrated) return;
+      
+      pvzEditing = true;
+      pvzBeforeEdit = { lat: PVZ.lat, lng: PVZ.lng };
+      pvzMarker.dragging.enable();
+      toggleBtn.style.display = 'none';
+      banner.classList.add('show');
+      toast('Перетащи синюю точку точно на дом ПВЗ и нажми «Сохранить»');
+    });
+
+    saveBtn.addEventListener('click', function(){
+      var ll = pvzMarker.getLatLng();
+      PVZ.lat = ll.lat; PVZ.lng = ll.lng;
+      exitPvzEdit(toggleBtn, banner);
+      persistPvzLocation(PVZ.lat, PVZ.lng);
+      pvzCalibrated = true;
+      updatePvzUI();
+      if(chosenDest){
+        var distM = map.distance(chosenDest, [PVZ.lat, PVZ.lng]);
+        updatePrice(distM);
+      }
+      toast('Точка ПВЗ сохранена!');
+    });
+
+    cancelBtn.addEventListener('click', function(){
+      if(pvzBeforeEdit){
+        pvzMarker.setLatLng([pvzBeforeEdit.lat, pvzBeforeEdit.lng]);
+        zoneCircle.setLatLng([pvzBeforeEdit.lat, pvzBeforeEdit.lng]);
+      }
+      exitPvzEdit(toggleBtn, banner);
+    });
+  }
+
+  function exitPvzEdit(toggleBtn, banner){
+    pvzEditing = false;
+    pvzMarker.dragging.disable();
+    banner.classList.remove('show');
+    toggleBtn.style.display = '';
+  }
+
+  function updatePvzUI(){
+    var toggleBtn = document.getElementById('pvzEditToggle');
+    var calibratedBadge = document.getElementById('pvzCalibratedBadge');
+    
+    if(pvzCalibrated){
+      toggleBtn.style.display = 'none';
+      calibratedBadge.classList.add('show');
+    } else {
+      toggleBtn.style.display = '';
+      calibratedBadge.classList.remove('show');
+    }
+  }
+
+  async function persistPvzLocation(lat, lng){
+    try{
+      localStorage.setItem('pvz_location_calibrated', 'true');
+      localStorage.setItem('pvz_location_lat', String(lat));
+      localStorage.setItem('pvz_location_lng', String(lng));
+    }catch(e){
+      toast('Не удалось сохранить точку');
+    }
+  }
+
+  async function loadSavedPvz(){
+    try{
+      var calibrated = localStorage.getItem('pvz_location_calibrated');
+      if(calibrated === 'true'){
+        var lat = parseFloat(localStorage.getItem('pvz_location_lat'));
+        var lng = parseFloat(localStorage.getItem('pvz_location_lng'));
+        if(!isNaN(lat) && !isNaN(lng)){
+          return { lat: lat, lng: lng };
+        }
+      }
+      return null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  function geocodePvz(){
+    loadSavedPvz().then(function(saved){
+      if(saved) return;
+      
+      var viewbox = (PVZ.lng-0.02) + ',' + (PVZ.lat+0.02) + ',' + (PVZ.lng+0.02) + ',' + (PVZ.lat-0.02);
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ru'
+        + '&bounded=1&viewbox=' + viewbox + '&q=' + encodeURIComponent(PVZ_QUERY);
+      fetch(url, {headers:{'Accept':'application/json'}})
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if(data && data[0]){
+            var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+            var drift = map.distance([lat,lng], [PVZ.lat, PVZ.lng]);
+            if(drift <= MAX_SANE_DRIFT_M){
+              PVZ.lat = lat; PVZ.lng = lng;
+              pvzMarker.setLatLng([lat, lng]);
+              zoneCircle.setLatLng([lat, lng]);
+              map.setView([lat, lng], 16);
+            }
+          }
+        })
+        .catch(function(){});
+    });
+  }
+
+  function placeDest(latlng){
+    chosenDest = latlng;
+    var destIcon = L.divIcon({ className: '', html: '<div class="dest-dot"></div>', iconSize:[20,24], iconAnchor:[10,24] });
+    if(destMarker){ map.removeLayer(destMarker); }
+    destMarker = L.marker(latlng, {icon: destIcon}).addTo(map);
+
+    var distM = map.distance(latlng, [PVZ.lat, PVZ.lng]);
+    updatePrice(distM);
+    document.getElementById('mapHint').textContent = 'Адрес выбран — можно поменять точку в любой момент';
+    document.getElementById('sumAddress').textContent = 'Определяю адрес…';
+    reverseGeocode(latlng);
+    validateForm(false);
+  }
+
+  function reverseGeocode(latlng){
+    var seq = ++geoAbortSeq;
+    setGeoLoading(true);
+    var url = 'https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=' + latlng.lat + '&lon=' + latlng.lng;
+    fetch(url, {headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(seq !== geoAbortSeq) return;
+        var text = formatAddress(data);
+        chosenAddressText = text;
+        document.getElementById('sumAddress').textContent = text;
+      })
+      .catch(function(){
+        if(seq !== geoAbortSeq) return;
+        var fallback = latlng.lat.toFixed(5) + ', ' + latlng.lng.toFixed(5);
+        chosenAddressText = fallback;
+        document.getElementById('sumAddress').textContent = fallback;
+      })
+      .finally(function(){ if(seq === geoAbortSeq) setGeoLoading(false); });
+  }
+
+  function formatAddress(data){
+    if(!data || !data.address) return 'Точка на карте';
+    var a = data.address;
+    var street = a.road || a.pedestrian || a.residential || a.street || '';
+    var house = a.house_number || '';
+    var parts = [];
+    if(street){ parts.push(street + (house ? ' ' + house : '')); }
+    else if(house){ parts.push('д. ' + house); }
+    if(!parts.length && data.display_name){ return data.display_name.split(',').slice(0,2).join(','); }
+    if(!parts.length) return 'Точка на карте';
+    return parts.join(', ');
+  }
+
+  function updatePrice(distM){
+    var price = Math.round(BASE_PRICE + (distM/100)*RATE_PER_100M);
+    var badge = document.getElementById('priceBadge');
+    var distText = (distM < 1000) ? Math.round(distM) + ' м' : (distM/1000).toFixed(2) + ' км';
+    document.getElementById('priceValue').textContent = price + ' ₽';
+    document.getElementById('sumDistance').textContent = distText;
+    document.getElementById('sumPrice').textContent = price + ' ₽';
+    badge.classList.remove('bump');
+    void badge.offsetWidth;
+    badge.classList.add('bump');
+    lastPrice = price;
+    lastDistanceText = distText;
+  }
+
+  // ---------- FORM VALIDATION ----------
+  var fname = document.getElementById('fname');
+  var lname = document.getElementById('lname');
+  var phone = document.getElementById('phone');
+  var barcode = document.getElementById('barcode');
+  var submitBtn = document.getElementById('submitBtn');
+  var submitHint = document.getElementById('submitHint');
+
+  [fname,lname,phone,barcode].forEach(function(el){
+    el.addEventListener('input', function(){ validateForm(false); });
+    el.addEventListener('blur', function(){ validateForm(true); });
+  });
+
+  function phoneValid(v){
+    var digits = v.replace(/\D/g,'');
+    return digits.length >= 10 && digits.length <= 11;
+  }
+  function barcodeValid(v){
+    return /^\d{9}\*\d{4}$/.test(v.trim());
+  }
+  function nameValid(v){
+    return v.trim().length > 1;
+  }
+
+  function setFieldState(input, errEl, ok, message, showError){
+    input.classList.toggle('error', !ok && showError);
+    if(errEl){
+      errEl.textContent = (!ok && showError) ? message : '';
+      errEl.classList.toggle('show', !ok && showError);
+    }
+  }
+
+  function validateForm(showErrors){
+    var okName1 = nameValid(fname.value);
+    var okName2 = nameValid(lname.value);
+    var okPhone = phoneValid(phone.value);
+    var okBarcode = barcodeValid(barcode.value);
+    var okDest = chosenDest !== null;
+    var cooldown = isCooldownActive();
+
+    setFieldState(fname, document.getElementById('err-fname'), okName1, 'Введите имя (мин. 2 буквы)', showErrors);
+    setFieldState(lname, document.getElementById('err-lname'), okName2, 'Введите фамилию (мин. 2 буквы)', showErrors);
+    setFieldState(phone, document.getElementById('err-phone'), okPhone, 'Введите корректный номер телефона', showErrors);
+    setFieldState(barcode, document.getElementById('err-barcode'), okBarcode, 'Формат: 9 цифр, звёздочка, 4 цифры (напр. 123456789*8765)', showErrors);
+
+    var ok = okName1 && okName2 && okPhone && okBarcode && okDest && !cooldown;
+    submitBtn.disabled = !ok;
+
+    if(cooldown){
+      submitHint.textContent = '⏳ Подождите 15 минут между заказами';
+    } else if(ok){ 
+      submitHint.textContent = ''; 
+    } else if(!okDest){ 
+      submitHint.textContent = 'Осталось выбрать адрес доставки на карте'; 
+    } else { 
+      submitHint.textContent = 'Проверь поля, отмеченные красным'; 
+    }
+    return ok;
+  }
+
+  // ============================================================
+  // ⭐ ОСНОВНАЯ ФУНКЦИЯ ОФОРМЛЕНИЯ ЗАКАЗА
+  // ============================================================
+  // Храним данные заказа для оплаты
+  var pendingOrderData = null;
+
+  function submitOrderWithFirebase() {
+    var ok = validateForm(true);
+    if(!ok){
+      if(isCooldownActive()) {
+        toast('⏳ Подождите 15 минут между заказами');
+      } else if(!chosenDest) {
+        toast('Сначала выбери адрес доставки на карте');
+      } else {
+        toast('Проверь поля, отмеченные красным');
+      }
+      return;
+    }
+
+    if(isCooldownActive()) {
+      toast('⏳ Подождите 15 минут между заказами');
+      return;
+    }
+
+    // Генерируем НАСТОЯЩИЙ номер заказа
+    var orderId = generateOrderNumber();
+
+    // Собираем данные заказа
+    var orderData = {
+      id: orderId,
+      firstName: fname.value.trim(),
+      lastName: lname.value.trim(),
+      phone: phone.value.trim(),
+      barcode: barcode.value.trim(),
+      address: chosenAddressText || 'Точка на карте',
+      distance: lastDistanceText || '—',
+      price: (lastPrice || 0) + ' ₽',
+      lat: chosenDest ? chosenDest.lat : null,
+      lng: chosenDest ? chosenDest.lng : null
+    };
+
+    // Сохраняем для оплаты
+    pendingOrderData = orderData;
+
+    console.log('📦 Подготовлен заказ:', orderData);
+
+    // Показываем ОКНО ОПЛАТЫ
+    showPaymentModal(orderData.price);
+  }
+
+  // ============================================================
+  // МОДАЛКА ОПЛАТЫ
+  // ============================================================
+  function showPaymentModal(price) {
+    document.getElementById('paymentPrice').textContent = price;
+    document.getElementById('paymentModal').classList.add('show');
+  }
+
+  // Функция завершения заказа (вызывается после оплаты)
+  function finalizeOrder() {
+    if (!pendingOrderData) {
+      toast('❌ Ошибка: данные заказа потеряны');
+      return;
+    }
+
+    var orderData = pendingOrderData;
+
+    // Сохраняем в Firebase
+    saveOrderToFirebase(orderData)
+      .then(function() {
+        console.log('✅ Заказ сохранён в Firebase!');
+        
+        // 🟢 ТОЛЬКО ТУТ запускаем кулдаун — после успешного сохранения
+        setLastOrderTime();
+        
+        // Сохраняем ID заказа в localStorage для отслеживания
+        try {
+          localStorage.setItem('my_last_order_id', orderData.id);
+          localStorage.setItem('my_last_order_data', JSON.stringify(orderData));
+        } catch(e) {}
+        
+        // Обновляем кулдаун UI
+        updateCooldownUI();
+        
+        // Показываем модалку с подтверждением
+        document.getElementById('orderId').textContent = 'Заказ №' + orderData.id;
+        document.getElementById('modal-overlay').classList.add('show');
+        
+        // Очищаем pending
+        pendingOrderData = null;
+      })
+      .catch(function(error) {
+        console.error('❌ Ошибка сохранения в Firebase:', error);
+        showFBToast('⚠️ Внимание!', 'Заказ не сохранился. Попробуйте ещё раз.');
+        // Не запускаем кулдаун при ошибке
+      });
+  }
+
+  // Обработчик кнопки "Оплатить"
+  document.getElementById('payBtn').addEventListener('click', function() {
+    var selected = document.querySelector('input[name="paymentMethod"]:checked');
+    var method = selected ? selected.value : 'cash';
+    
+    var hint = document.getElementById('paymentHint');
+    if (method === 'cash') {
+      hint.textContent = '💵 Оплата наличными курьеру при получении заказа';
+    } else {
+      hint.textContent = '💳 Реквизиты для перевода: 1234 5678 9012 3456 (СБП)';
+    }
+    
+    // Закрываем модалку оплаты
+    document.getElementById('paymentModal').classList.remove('show');
+    
+    // Показываем уведомление
+    showFBToast('✅ Оплата принята!', 'Способ оплаты: ' + (method === 'cash' ? 'Наличные при встрече' : 'Переводом на карту'));
+    
+    // 🟢 ФИНАЛИЗИРУЕМ ЗАКАЗ — только тут запускается кулдаун
+    finalizeOrder();
+  });
+
+  document.getElementById('payCancelBtn').addEventListener('click', function() {
+    document.getElementById('paymentModal').classList.remove('show');
+    pendingOrderData = null;
+    toast('❌ Оплата отменена, заказ не оформлен');
+  });
+
+  // Закрытие модалки оплаты по клику вне
+  document.getElementById('paymentModal').addEventListener('click', function(e){
+    if(e.target === this) {
+      this.classList.remove('show');
+      pendingOrderData = null;
+      toast('❌ Оплата отменена, заказ не оформлен');
+    }
+  });
+
+  // Обработчики для выбора способа оплаты
+  document.querySelectorAll('input[name="paymentMethod"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      document.querySelectorAll('.payment-options label').forEach(function(lbl) {
+        lbl.classList.remove('selected');
+      });
+      if (this.checked) {
+        this.closest('label').classList.add('selected');
+      }
+      var hint = document.getElementById('paymentHint');
+      if (this.value === 'cash') {
+        hint.textContent = '⚠️ Оплата производится курьеру при получении заказа';
+      } else {
+        hint.textContent = '💳 Реквизиты для перевода: 1234 5678 9012 3456 (СБП)';
+      }
+    });
+  });
+
+  // ============================================================
+  // ЛОКАЛЬНОЕ ХРАНЕНИЕ ДЛЯ ОТСЛЕЖИВАНИЯ
+  // ============================================================
+  function getLastOrderId() {
+    try {
+      return localStorage.getItem('my_last_order_id');
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function getLastOrderData() {
+    try {
+      var data = localStorage.getItem('my_last_order_data');
+      if (data) return JSON.parse(data);
+      return null;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function loadMyOrder() {
+    var orderId = getLastOrderId();
+    if (!orderId) return Promise.resolve(null);
+
+    var localData = getLastOrderData();
+    if (localData && localData.id === orderId) {
+      return Promise.resolve(localData);
+    }
+
+    return new Promise(function(resolve) {
+      const ordersRef = database.ref('homeDelivery/orders');
+      ordersRef.orderByChild('orderId').equalTo(orderId).once('value')
+        .then(function(snapshot) {
+          const data = snapshot.val();
+          if (!data) {
+            resolve(null);
+            return;
+          }
+          const keys = Object.keys(data);
+          if (keys.length === 0) {
+            resolve(null);
+            return;
+          }
+          const orderData = data[keys[0]];
+          resolve({
+            id: orderData.orderId || orderId,
+            firstName: orderData.firstName || '',
+            lastName: orderData.lastName || '',
+            address: orderData.address || '—',
+            price: orderData.price || '0 ₽',
+            status: orderData.status || 'new'
+          });
+        })
+        .catch(function() {
+          resolve(null);
+        });
+    });
+  }
+
+  function statusClass(status){
+    var s = (status || '').toLowerCase();
+    if(s === 'delivered' || s.indexOf('достав') === 0 || s.indexOf('вручен') !== -1) return 'status-done';
+    if(s === 'cancelled' || s.indexOf('отмен') !== -1 || s.indexOf('сгор') !== -1) return 'status-cancel';
+    if(s === 'transit' || s.indexOf('пути') !== -1 || s.indexOf('курьер') !== -1) return 'status-transit';
+    return '';
+  }
+
+  function showTrackState(name){
+    ['trackLoading','trackEmpty','trackFound','trackError'].forEach(function(id){
+      document.getElementById(id).classList.toggle('active', id === name);
+    });
+  }
+
+  function renderOrder(order){
+    document.getElementById('trackOrderId').textContent = '№' + order.id;
+    document.getElementById('trackAddress').textContent = order.address;
+    document.getElementById('trackRecipient').textContent = (order.firstName || '') + ' ' + (order.lastName || '');
+    document.getElementById('trackPrice').textContent = order.price;
+    
+    var statusMap = {
+      'new': 'Оформлен',
+      'transit': 'В пути',
+      'delivered': 'Доставлен',
+      'cancelled': 'Отменён'
+    };
+    var statusText = statusMap[order.status] || order.status || 'Оформлен';
+    document.getElementById('trackStatusText').textContent = statusText;
+    
+    var badge = document.getElementById('trackStatusBadge');
+    badge.className = 'status-badge ' + statusClass(order.status);
+  }
+
+  function checkOrderStatusFromFirebase(orderId) {
+    return new Promise(function(resolve, reject) {
+      const ordersRef = database.ref('homeDelivery/orders');
+      ordersRef.orderByChild('orderId').equalTo(orderId).once('value')
+        .then(function(snapshot) {
+          const data = snapshot.val();
+          if (!data) {
+            resolve(null);
+            return;
+          }
+          const keys = Object.keys(data);
+          if (keys.length === 0) {
+            resolve(null);
+            return;
+          }
+          const orderData = data[keys[0]];
+          resolve({
+            id: orderData.orderId || orderId,
+            firstName: orderData.firstName || '',
+            lastName: orderData.lastName || '',
+            address: orderData.address || '—',
+            price: orderData.price || '0 ₽',
+            status: orderData.status || 'new'
+          });
+        })
+        .catch(function(error) {
+          reject(error);
+        });
+    });
+  }
+
+  function runTrackCheck(){
+    showTrackState('trackLoading');
+    var orderId = getLastOrderId();
+    
+    if (!orderId) {
+      showTrackState('trackEmpty');
+      return;
+    }
+
+    var localData = getLastOrderData();
+    if (localData && localData.id === orderId) {
+      renderOrder(localData);
+      checkOrderStatusFromFirebase(orderId).then(function(updatedOrder){
+        if(updatedOrder){
+          renderOrder(updatedOrder);
+          try {
+            localStorage.setItem('my_last_order_data', JSON.stringify(updatedOrder));
+          } catch(e) {}
+        }
+        showTrackState('trackFound');
+      }).catch(function(){
+        showTrackState('trackFound');
+      });
+    } else {
+      checkOrderStatusFromFirebase(orderId).then(function(updatedOrder){
+        if(updatedOrder){
+          renderOrder(updatedOrder);
+          try {
+            localStorage.setItem('my_last_order_data', JSON.stringify(updatedOrder));
+          } catch(e) {}
+          showTrackState('trackFound');
+        } else {
+          showTrackState('trackEmpty');
+        }
+      }).catch(function(){
+        showTrackState('trackError');
+      });
+    }
+  }
+
+  // ============================================================
+  // ПОДКЛЮЧАЕМ НОВУЮ ФУНКЦИЮ SUBMIT
+  // ============================================================
+  submitBtn.addEventListener('click', function() {
+    submitOrderWithFirebase();
+  });
+
+  // ============================================================
+  // МОДАЛКИ
+  // ============================================================
+  document.getElementById('modalCloseBtn').addEventListener('click', function(){
+    document.getElementById('modal-overlay').classList.remove('show');
+  });
+
+  var trackOverlay = document.getElementById('track-overlay');
+  document.getElementById('openTrackBtn').addEventListener('click', function(){
+    trackOverlay.classList.add('show');
+    runTrackCheck();
+  });
+  document.getElementById('trackRefreshBtn').addEventListener('click', runTrackCheck);
+  document.getElementById('trackRetryBtn').addEventListener('click', runTrackCheck);
+  document.getElementById('trackGoOrderBtn').addEventListener('click', function(){
+    trackOverlay.classList.remove('show');
+    document.querySelector('.form-card').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+  ['trackCloseBtn1','trackCloseBtn2','trackCloseBtn3'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', function(){
+      trackOverlay.classList.remove('show');
+    });
+  });
+  trackOverlay.addEventListener('click', function(e){
+    if(e.target === trackOverlay) trackOverlay.classList.remove('show');
+  });
+
+  window.addEventListener('load', function() {
+    var orderId = getLastOrderId();
+    if (orderId) {
+      console.log('📦 Найден сохранённый заказ:', orderId);
+    }
+  });
+
+  console.log('✅ Клиентский сайт готов!');
+  console.log('🏠 Опорная точка: ул. Комсомольская, 4, пгт Стрижи');
+  console.log('📦 Номер заказа генерируется на основе времени');
+  console.log('⏳ Кулдаун 15 минут запускается ТОЛЬКО после успешной оплаты');
+  console.log('💳 Модалка оплаты с выбором способа');
+
+})();
+</script>
+</body>
+</html>
