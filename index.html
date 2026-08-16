@@ -43,7 +43,6 @@
   }
   button{font-family:inherit;}
 
-  /* ================= SPLASH ================= */
   #splash{
     position:fixed;inset:0;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -73,7 +72,6 @@
   .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,91,255,0.42);}
   .btn-primary:active{transform:translateY(0px) scale(0.98);}
 
-  /* ================= APP SHELL ================= */
   #app{display:none;min-height:100vh;padding-bottom:40px;}
   #app.show{display:block;animation:fadein .5s ease;}
   @keyframes fadein{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
@@ -98,10 +96,8 @@
   .btn-track:hover{transform:translateY(-1px);}
 
   main{max-width:1180px;margin:0 auto;padding:0 20px;}
-
   .hero-line{font-size:14.5px;color:var(--ink-soft);font-weight:600;margin:2px 4px 16px;max-width:760px;}
   .hero-line b{color:var(--ink);}
-
   .layout-grid{display:flex;flex-direction:column;gap:20px;}
 
   .map-card{
@@ -174,7 +170,6 @@
   .form-card .sub{margin:0 0 18px;color:var(--ink-soft);font-size:13px;font-weight:600;}
 
   .row{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px;}
-
   .field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.01em;}
   .field input{
     width:100%;border:1.5px solid var(--line);background:var(--tint);border-radius:var(--radius-sm);
@@ -217,7 +212,6 @@
   }
   .toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
 
-  /* ================= MODALS ================= */
   .overlay{
     position:fixed;inset:0;background:rgba(11,31,58,0.55);display:none;align-items:center;
     justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(2px);
@@ -241,7 +235,6 @@
   .modal-ghost{margin-top:10px;width:100%;background:transparent;color:var(--ink-soft);
     border:1.5px solid var(--line);border-radius:999px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;}
 
-  /* ================= PAYMENT MODAL ================= */
   .payment-modal .modal-card{max-width:440px;}
   .payment-modal .price-display{
     font-size:32px;font-weight:800;color:var(--ozon-blue);
@@ -295,7 +288,6 @@
   .payment-modal .btn-pay:hover{transform:translateY(-1px);}
   .payment-modal .btn-pay:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 
-  /* ================= COOLDOWN ================= */
   .cooldown-badge{
     display:inline-block;
     background:#fce4ec;
@@ -333,7 +325,6 @@
 
   .leaflet-container{font-family:'Manrope', sans-serif;}
 
-  /* ================= FIREBASE TOAST ================= */
   .fb-toast {
     position: fixed;
     bottom: 90px;
@@ -358,7 +349,6 @@
     to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
-  /* ================= TABLET (>= 700px) ================= */
   @media (min-width:700px){
     .row{grid-template-columns:1fr 1fr;}
     .form-card{padding:26px;}
@@ -367,7 +357,6 @@
     .price-badge .value{font-size:20px;}
   }
 
-  /* ================= DESKTOP (>= 1040px) ================= */
   @media (min-width:1040px){
     header.topbar{padding:22px 20px;}
     .layout-grid{flex-direction:row;align-items:flex-start;gap:24px;}
@@ -616,6 +605,53 @@
   console.log('🔥 Firebase инициализирован на клиентском сайте!');
 
   // ============================================================
+  // СОХРАНЕНИЕ ТОЧКИ ПВЗ В FIREBASE
+  // ============================================================
+  
+  function savePvzToFirebase(lat, lng) {
+    const pvzRef = database.ref('pvzLocation');
+    return pvzRef.set({
+        lat: lat,
+        lng: lng,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+
+  function loadPvzFromFirebase() {
+    const pvzRef = database.ref('pvzLocation');
+    return pvzRef.once('value').then((snapshot) => {
+        const data = snapshot.val();
+        if (data && data.lat && data.lng) {
+            return { lat: data.lat, lng: data.lng };
+        }
+        return null;
+    });
+  }
+
+  function listenPvzChanges() {
+    const pvzRef = database.ref('pvzLocation');
+    pvzRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.lat && data.lng && typeof map !== 'undefined' && map) {
+            PVZ.lat = data.lat;
+            PVZ.lng = data.lng;
+            pvzMarker.setLatLng([PVZ.lat, PVZ.lng]);
+            zoneCircle.setLatLng([PVZ.lat, PVZ.lng]);
+            
+            if (chosenDest) {
+                const distM = map.distance(chosenDest, [PVZ.lat, PVZ.lng]);
+                updatePrice(distM);
+            }
+            
+            pvzCalibrated = true;
+            updatePvzUI();
+            
+            toast('📍 Точка ПВЗ обновлена');
+        }
+    });
+  }
+
+  // ============================================================
   // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ТОСТОВ
   // ============================================================
   function showFBToast(title, text) {
@@ -802,20 +838,43 @@
       placeDest(e.latlng);
     });
 
-    loadSavedPvz().then(function(saved){
+    initPvzEditControl();
+
+    // Загружаем точку из Firebase
+    loadPvzFromFirebase().then(function(saved){
       if(saved){
-        PVZ.lat = saved.lat; PVZ.lng = saved.lng;
+        PVZ.lat = saved.lat; 
+        PVZ.lng = saved.lng;
         pvzMarker.setLatLng([PVZ.lat, PVZ.lng]);
         zoneCircle.setLatLng([PVZ.lat, PVZ.lng]);
         map.setView([PVZ.lat, PVZ.lng], 16);
         pvzCalibrated = true;
         updatePvzUI();
+        console.log('✅ Точка ПВЗ загружена из Firebase');
       } else {
-        geocodePvz();
+        // Если в Firebase нет, пробуем загрузить из localStorage (для совместимости)
+        loadSavedPvz().then(function(localSaved){
+          if(localSaved){
+            PVZ.lat = localSaved.lat; 
+            PVZ.lng = localSaved.lng;
+            pvzMarker.setLatLng([PVZ.lat, PVZ.lng]);
+            zoneCircle.setLatLng([PVZ.lat, PVZ.lng]);
+            map.setView([PVZ.lat, PVZ.lng], 16);
+            pvzCalibrated = true;
+            updatePvzUI();
+            // Сохраняем в Firebase для всех
+            savePvzToFirebase(PVZ.lat, PVZ.lng).then(() => {
+              console.log('✅ Точка ПВЗ сохранена в Firebase');
+            });
+          } else {
+            geocodePvz();
+          }
+        });
       }
     });
 
-    initPvzEditControl();
+    // Слушаем изменения от других пользователей
+    listenPvzChanges();
   }
 
   // ---------- PVZ CALIBRATION ----------
@@ -829,7 +888,10 @@
     var cancelBtn = document.getElementById('pvzCancelBtn');
 
     toggleBtn.addEventListener('click', function(){
-      if(pvzCalibrated) return;
+      if(pvzCalibrated) {
+        toast('✅ Точка ПВЗ уже откалибрована');
+        return;
+      }
       
       pvzEditing = true;
       pvzBeforeEdit = { lat: PVZ.lat, lng: PVZ.lng };
@@ -841,16 +903,28 @@
 
     saveBtn.addEventListener('click', function(){
       var ll = pvzMarker.getLatLng();
-      PVZ.lat = ll.lat; PVZ.lng = ll.lng;
-      exitPvzEdit(toggleBtn, banner);
-      persistPvzLocation(PVZ.lat, PVZ.lng);
-      pvzCalibrated = true;
-      updatePvzUI();
-      if(chosenDest){
-        var distM = map.distance(chosenDest, [PVZ.lat, PVZ.lng]);
-        updatePrice(distM);
-      }
-      toast('Точка ПВЗ сохранена!');
+      PVZ.lat = ll.lat; 
+      PVZ.lng = ll.lng;
+      
+      // Сохраняем в Firebase
+      savePvzToFirebase(PVZ.lat, PVZ.lng)
+        .then(() => {
+          exitPvzEdit(toggleBtn, banner);
+          pvzCalibrated = true;
+          updatePvzUI();
+          // Сохраняем локально для резерва
+          persistPvzLocation(PVZ.lat, PVZ.lng);
+          
+          if(chosenDest){
+            var distM = map.distance(chosenDest, [PVZ.lat, PVZ.lng]);
+            updatePrice(distM);
+          }
+          toast('✅ Точка ПВЗ сохранена для всех!');
+        })
+        .catch((error) => {
+          console.error('❌ Ошибка сохранения:', error);
+          toast('❌ Не удалось сохранить точку ПВЗ');
+        });
     });
 
     cancelBtn.addEventListener('click', function(){
@@ -888,7 +962,7 @@
       localStorage.setItem('pvz_location_lat', String(lat));
       localStorage.setItem('pvz_location_lng', String(lng));
     }catch(e){
-      toast('Не удалось сохранить точку');
+      // тихо
     }
   }
 
@@ -922,10 +996,15 @@
             var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
             var drift = map.distance([lat,lng], [PVZ.lat, PVZ.lng]);
             if(drift <= MAX_SANE_DRIFT_M){
-              PVZ.lat = lat; PVZ.lng = lng;
+              PVZ.lat = lat; 
+              PVZ.lng = lng;
               pvzMarker.setLatLng([lat, lng]);
               zoneCircle.setLatLng([lat, lng]);
               map.setView([lat, lng], 16);
+              // Сохраняем найденную точку в Firebase
+              savePvzToFirebase(lat, lng).then(() => {
+                console.log('✅ Точка ПВЗ найдена и сохранена');
+              });
             }
           }
         })
@@ -1058,7 +1137,6 @@
   // ============================================================
   // ⭐ ОСНОВНАЯ ФУНКЦИЯ ОФОРМЛЕНИЯ ЗАКАЗА
   // ============================================================
-  // Храним данные заказа для оплаты
   var pendingOrderData = null;
 
   function submitOrderWithFirebase() {
@@ -1079,10 +1157,8 @@
       return;
     }
 
-    // Генерируем НАСТОЯЩИЙ номер заказа
     var orderId = generateOrderNumber();
 
-    // Собираем данные заказа
     var orderData = {
       id: orderId,
       firstName: fname.value.trim(),
@@ -1096,12 +1172,8 @@
       lng: chosenDest ? chosenDest.lng : null
     };
 
-    // Сохраняем для оплаты
     pendingOrderData = orderData;
-
     console.log('📦 Подготовлен заказ:', orderData);
-
-    // Показываем ОКНО ОПЛАТЫ
     showPaymentModal(orderData.price);
   }
 
@@ -1113,7 +1185,6 @@
     document.getElementById('paymentModal').classList.add('show');
   }
 
-  // Функция завершения заказа (вызывается после оплаты)
   function finalizeOrder() {
     if (!pendingOrderData) {
       toast('❌ Ошибка: данные заказа потеряны');
@@ -1122,38 +1193,25 @@
 
     var orderData = pendingOrderData;
 
-    // Сохраняем в Firebase
     saveOrderToFirebase(orderData)
       .then(function() {
         console.log('✅ Заказ сохранён в Firebase!');
-        
-        // 🟢 ТОЛЬКО ТУТ запускаем кулдаун — после успешного сохранения
         setLastOrderTime();
-        
-        // Сохраняем ID заказа в localStorage для отслеживания
         try {
           localStorage.setItem('my_last_order_id', orderData.id);
           localStorage.setItem('my_last_order_data', JSON.stringify(orderData));
         } catch(e) {}
-        
-        // Обновляем кулдаун UI
         updateCooldownUI();
-        
-        // Показываем модалку с подтверждением
         document.getElementById('orderId').textContent = 'Заказ №' + orderData.id;
         document.getElementById('modal-overlay').classList.add('show');
-        
-        // Очищаем pending
         pendingOrderData = null;
       })
       .catch(function(error) {
         console.error('❌ Ошибка сохранения в Firebase:', error);
         showFBToast('⚠️ Внимание!', 'Заказ не сохранился. Попробуйте ещё раз.');
-        // Не запускаем кулдаун при ошибке
       });
   }
 
-  // Обработчик кнопки "Оплатить"
   document.getElementById('payBtn').addEventListener('click', function() {
     var selected = document.querySelector('input[name="paymentMethod"]:checked');
     var method = selected ? selected.value : 'cash';
@@ -1162,16 +1220,11 @@
     if (method === 'cash') {
       hint.textContent = '💵 Оплата наличными курьеру при получении заказа';
     } else {
-      hint.textContent = '💳 Реквизиты для перевода: НЕДОСТУПНО(СБП)';
+      hint.textContent = '💳 Реквизиты для перевода: 1234 5678 9012 3456 (СБП)';
     }
     
-    // Закрываем модалку оплаты
     document.getElementById('paymentModal').classList.remove('show');
-    
-    // Показываем уведомление
     showFBToast('✅ Оплата принята!', 'Способ оплаты: ' + (method === 'cash' ? 'Наличные при встрече' : 'Переводом на карту'));
-    
-    // 🟢 ФИНАЛИЗИРУЕМ ЗАКАЗ — только тут запускается кулдаун
     finalizeOrder();
   });
 
@@ -1181,7 +1234,6 @@
     toast('❌ Оплата отменена, заказ не оформлен');
   });
 
-  // Закрытие модалки оплаты по клику вне
   document.getElementById('paymentModal').addEventListener('click', function(e){
     if(e.target === this) {
       this.classList.remove('show');
@@ -1190,7 +1242,6 @@
     }
   });
 
-  // Обработчики для выбора способа оплаты
   document.querySelectorAll('input[name="paymentMethod"]').forEach(function(radio) {
     radio.addEventListener('change', function() {
       document.querySelectorAll('.payment-options label').forEach(function(lbl) {
@@ -1414,7 +1465,7 @@
   });
 
   console.log('✅ Клиентский сайт готов!');
-  console.log('🏠 Опорная точка: ул. Комсомольская, 4, пгт Стрижи');
+  console.log('🏠 Опорная точка сохраняется в Firebase и видна всем');
   console.log('📦 Номер заказа генерируется на основе времени');
   console.log('⏳ Кулдаун 15 минут запускается ТОЛЬКО после успешной оплаты');
   console.log('💳 Модалка оплаты с выбором способа');
